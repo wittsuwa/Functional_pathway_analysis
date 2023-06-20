@@ -1,0 +1,404 @@
+library(ReactomePA)
+library(clusterProfiler)
+library(DOSE)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(org.Mm.eg.db)
+library(pathview)
+library(enrichplot)
+library(clusterProfiler.dplyr)
+library(ggstance)
+library(forcats)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(devtools)
+##convert gene symbol to ENTREZID
+#Example
+library(org.Hs.eg.db)
+hs <- org.Hs.eg.db
+my.symbols <- c("ANKRD62P1-PARP4P3")
+AnnotationDbi::select(hs, 
+       keys = my.symbols,
+       columns = c("ENTREZID", "SYMBOL"),
+       keytype = "SYMBOL")
+
+vip_dge <- filter(res.dat, log2FoldChange >0 & padj < 0.05) 
+vip_dge <- drop_na(vip_dge)
+vip_dge <- tibble::rownames_to_column(vip_dge)
+# my samples
+my.symbols = vip_dge$rowname
+annotation = AnnotationDbi::select(hs, 
+                      keys = my.symbols,
+                      columns = c("ENTREZID", "SYMBOL"),
+                      keytype = "SYMBOL")
+
+##merge table
+merge_table = merge(annotation,vip_dge, by = "SYMBOL")
+#remove column
+merge_table = merge_table[,2:3]
+#remove duplicate
+merge_table = distinct(merge_table)
+#remove NA
+merge_table = drop_na(merge_table)
+
+
+
+##create file from .csv file
+## assume that 1st column is ID
+## 2nd column is fold change
+d=female_wt_vs_male_wt_pathway
+d = merge_table
+d <- annotation
+d <- drop_na(d)
+## feature 1: numeric vector
+geneList <- d[,2]
+
+## feature 2: named vector
+names(geneList) <- as.character(d[,1])
+
+## feature 3: decreasing order
+geneList <- sort(geneList, decreasing = TRUE)
+
+head(geneList)
+
+#GO over-representation test
+gene <- names(geneList)[abs(geneList) > 0]
+gene <- as.character(d[,2])
+ego <- enrichGO(gene          = gene,
+                OrgDb = org.Hs.eg.db,
+                keyType = "ENTREZID",
+                ont           = "ALL",
+                pAdjustMethod = "none",
+                pvalueCutoff  = 0.05,
+                readable      = TRUE)
+dotplot(ego)
+cnetplot(ego)
+ego.dat <- data.frame(ego)
+write.csv(ego.dat, file = "PVALB_GO_analysis.csv")
+write.csv
+ego <- enrichGO(gene          = gene,
+                OrgDb = org.Hs.eg.db,
+                keyType = "SYMBOL",
+                ont           = "ALL",
+                pAdjustMethod = "none",
+                pvalueCutoff  = 0.05,
+                readable      = FALSE)
+
+ego <- enrichGO(gene          = gene,
+                OrgDb = org.Mm.eg.db,
+                keyType = "ENTREZID",
+                ont           = "All",
+                pAdjustMethod = "none",
+                pvalueCutoff  = 0.05,
+                readable      = FALSE)
+
+ego <- enrichGO(gene          = gene,
+                OrgDb = org.Hs.eg.db,
+                keyType = "SYMBOL",
+                ont           = "All",
+                pAdjustMethod = "none",
+                pvalueCutoff  = 0.05,
+                readable      = FALSE)
+
+library(ggnewscale)
+ego_tree <- pairwise_termsim(ego)
+treeplot(ego_tree, color = "pvalue")
+ego = gofilter(ego)
+head(ego, n=5)
+a = data.frame(ego)
+View(a)
+write.csv(ego, file = "GO_CH1_16_06_22.csv")
+## convert gene ID to Symbol
+# SET THE DESIRED ORGANISM HERE
+organism = "org.Hg.eg.db"
+BiocManager::install(organism, character.only = TRUE)
+library(organism, character.only = TRUE)
+library(org.Hg.eg.db)
+ego_name <- setReadable(ego, hs, 'ENTREZID')
+ego_name <- setReadable(ego, hs, 'SYMBOL')
+
+ego_name = gofilter(ego_name)
+head(ego_name, n=5)
+a = data.frame(ego_name)
+a = data.frame(ego)
+View(a)
+write.csv(a, file = "In6_szlb_enrichGO.csv")
+##selected pathways
+dotplot(ego, showCategory = 5)
+dotplot(ego, showCategory = ego$Description[c(1,4,7,54,61)])
+cnetplot(ego, showCategory = 10)
+cnetplot(ego, showCategory = ego$Description[c(6,23)], colorEdge = TRUE)
+cnetplot(ego_name, showCategory = ego_name$Description[c(11,15,197,301,328,436)], colorEdge = TRUE, node_label="gene")
+cnetplot(ego_name, showCategory = ego_name$Description[c(11,15,197,301,328,436)], colorEdge = TRUE, node_label="category")
+
+dev.new()
+goplot(ego)
+ego2 = gofilter(ego)
+goplot(ego, showCategory = 5, geom = "label", color = "pvalue")
+dev.new()
+head(ego, n=5)
+View(ego)
+a = data.frame(ego)
+View(a)
+write.csv(ego, file = "GO_CH2.csv")
+
+dotplot(ego, showCategory = 10, color = "pvalue") + ggtitle("Hypermethylation in CH2")
+cnetplot(ego, showCategory = 5, cex_label_gene = 1, colorEdge=TRUE)
+cnetplot(ego, showCategory = 5, cex_label_gene = 1, colorEdge=TRUE, node_label="gene")
+heatplot(ego, showCategory = 5,foldChang = geneList)
+ridgeplot(ego)
+dev.new()
+library(ggnewscale)
+ego_tree <- pairwise_termsim(ego)
+treeplot(ego_tree, color = "pvalue")
+
+##groupGO
+ggo <- groupGO(gene     = gene,
+               OrgDb    = org.Hs.eg.db,
+               ont      = "BP",
+               level    = 9,
+               readable = TRUE)
+head(summary(ggo))
+ggo_dat = data.frame(ggo)
+write.csv(ggo_dat, file = "sMV_groupGO.csv")
+View(ggo_dat)
+ggo2 = gofilter(ggo)
+ggo_dat2 = data.frame(ggo2)
+write.csv(ggo_dat2, file = "sMV_groupGO_reduced.csv")
+View(ggo_dat2)
+
+a = exo_smv_mbr
+y1 <- as.data.frame(y)
+a$type = "SW480-EVs"
+a$type[a$BgRatio < 0] = "SW620-EVs"
+
+p <- ggplot(a[c(1:15),], aes(x = Count, y = fct_reorder(Description, Count))) + 
+  geom_point(aes(size = 20, color="red")) +
+  theme_bw(base_size = 18)
+
+p + facet_grid(.~type)
+p
+
+head(ggo)
+ggo_dat = data.frame(ggo)
+View(ggo_dat)
+write.csv(ggo, file = "sMV_CC_grop.csv")
+emapplot(ggo, layout = "nicely", method = "JC", color = "pvalue")
+dotplot(ggo)
+##GO Gene Set Enrichment Analysis
+ego3 <- gseGO(geneList     = geneList,
+              OrgDb        = org.Hs.eg.db,
+              ont          = "BP",
+              nPerm        = 1000,
+              minGSSize    = 20,
+              maxGSSize    = 500,
+              pvalueCutoff = 0.25,
+              verbose      = FALSE)
+a = data.frame(ego3)
+head(ego3)
+View(a)
+write.csv(ego3, file = "sMV_vs_Mbr_BP.csv")
+ridgeplot(ego3, showCategory=30,  fill = "pvalue")
+dotplot(ego3,showCategory=30, color="pvalue")
+emapplot(ego3, layout = "nicely", method = "JC", color = "pvalue")
+enrichMap(ego3)
+heatplot(ego3,foldChange=geneList, showCategory=20)
+gseaplot2(ego3, geneSetID = "GO:0000137")
+
+#remove redundancy of enriched GO terms
+ego3_2 <- simplify(ego3)
+write.csv(ego3_2, file = "sMV_vs_Mbr_CC_reduced.csv")
+ego3_2_sort <- ego3_2[order(ego3_2$rank), ]
+ridgeplot(ego3_2,showCategory=30,fill = "pvalue")
+dotplot(ego3_2,showCategory=30, color="pvalue")
+emapplot(ego3_2,layout = "nicely", method ="Wei", color = "pvalue")
+
+#change geneID to genename
+ego3_name <- setReadable(ego3_2, 'org.Hs.eg.db', 'ENTREZID')
+a = data.frame(ego3_name)
+write.csv(a, file = "sMV_vs_MBr_name_CC_reduced.csv")
+
+ego3_name <- setReadable(ego3, 'org.Hs.eg.db', 'ENTREZID')
+a = data.frame(ego3_name)
+write.csv(a, file = "sMV_vs_Mbr_name_CC.csv")
+
+
+
+
+cnetplot(ego3_name, 
+         foldChange=geneList, 
+         circular = TRUE, 
+         colorEdge = TRUE)
+
+cnetplot(ego3_name, 
+         foldChange=geneList,
+         showCategory = 5,
+         categorySize="geneNum",
+         colorEdge = TRUE)
+
+#dotplot up and down
+## count the gene number
+library(ggplot2)
+library(dplyr)
+library(stringr)
+gene_count<- ego3 %>% group_by(ID) %>% summarise(count = sum(str_count(core_enrichment, "/")) + 1)
+
+## merge with the original dataframe
+y <- as.data.frame(ego3)
+dot_df<- left_join(y, gene_count, by = "ID") %>% mutate(GeneRatio = count/setSize)
+dot_df = dot_df[1:200,] ## small dataset
+dot_df$type = "SW620"
+dot_df$type[dot_df$NES < 0] = "SW480"
+
+## from Tommy's code
+p <- ggplot(dot_df[c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21),], aes(x = GeneRatio, y = fct_reorder(Description, GeneRatio))) + 
+  geom_point(aes(size = GeneRatio, color = pvalue)) +
+  theme_bw(base_size = 18) +
+  scale_colour_gradient(limits=c(0, 0.05), low="red", high = "purple") +
+  ylab(NULL) +
+  ggtitle("GO Gene Set Enrichment")
+
+p + facet_grid(.~type)
+
+##Reactome pathway analysis
+#Over-representation
+gene <- names(geneList)[abs(geneList) > 0]
+x <- enrichPathway(gene=gene,pvalueCutoff=0.05, readable=T)
+a = data.frame(x)
+head(as.data.frame(x))
+ridgeplot(x,showCategory=10)
+dotplot(x, showCategory=10)
+emapplot(x)
+upsetplot(x)
+cnetplot(x, showCategory = 4, 
+         categorySize="pvalue", 
+         foldChange=geneList,
+         circular = TRUE, 
+         colorEdge = TRUE)
+
+#GSEA of Reactome
+y <- gsePathway(geneList, nPerm=1000,
+                pvalueCutoff=0.05, 
+                pAdjustMethod="BH",
+                verbose=FALSE)
+res <- as.data.frame(y)
+View(res)
+write.csv(res, file = "SW480_vs_SW620_Reactome.csv")
+res_name <- setReadable(y, 'org.Hs.eg.db', 'ENTREZID')
+a = data.frame(res_name)
+write.csv(res_name, file = "SW480_vs_SW620_name_Reactome.csv")
+
+ridgeplot(y,showCategory=30, fill = "pvalue")
+dotplot(y, showCategory=30, color ="pvalue")
+cnetplot(y, showCategory = 4, 
+         categorySize="pvalue", 
+         foldChange=geneList,
+         circular = TRUE, 
+         colorEdge = TRUE)
+emapplot(y, color="pvalue", layout = "nicely",method ="Wei")
+
+#dotplot up and down
+## count the gene number
+library(ggplot2)
+library(dplyr)
+library(stringr)
+y= Mbr_vs_Exo_CC
+gene_count<- y %>% group_by(ID) %>% summarise(count = sum(str_count(core_enrichment, "/")) + 1)
+
+## merge with the original dataframe
+y1 <- as.data.frame(y)
+dot_df<- left_join(y1, gene_count, by = "ID") %>% mutate(GeneRatio = count/setSize)
+dot_df = dot_df[1:200,] ## small dataset
+dot_df$type = "SW620"
+dot_df$type[dot_df$NES < 0] = "SW480"
+
+## from Tommy's code
+p <- ggplot(dot_df[c(1,2,5,6,7,8,9,10,14,17,18,19,21,22,23,31,33,34,35,36,40,43,49,50,53,54,57,59,66,68,69),], aes(x = GeneRatio, y = fct_reorder(Description, GeneRatio))) + 
+  geom_point(aes(size = GeneRatio, color = pvalue)) +
+  theme_bw(base_size = 18) +
+  scale_colour_gradient(limits=c(0, 0.05), low="red", high = "purple")
+
+p + facet_grid(.~type)
+
+#only one sample dot plot
+y= SW480_SW620_KEGG_overrep
+gene_count<- y %>% group_by(ID) %>% summarise(count = sum(str_count(core_enrichment, "/")) + 1)
+y1 <- as.data.frame(y)
+dot_df<- left_join(y1, gene_count, by = "ID") %>% mutate(GeneRatio = count/setSize)
+dot_df$type = "Exo vs LD"
+
+p <- ggplot(dot_df[c(25,29,32,40,60,65,68),], aes(x = GeneRatio, y = fct_reorder(Description, GeneRatio))) + 
+  geom_point(aes(size = GeneRatio, color = pvalue)) +
+  theme_bw(base_size = 19) +
+  scale_colour_gradient(limits=c(0, 0.05), low="red", high = "purple")
+
+p + facet_grid(.~type)
+
+##
+d = Mbr_rawdata
+## feature 1: numeric vector
+geneList <- d[,2]
+
+## feature 2: named vector
+names(geneList) <- as.character(d[,1])
+
+## feature 3: decreasing order
+geneList <- sort(geneList, decreasing = TRUE)
+
+head(geneList)
+
+##KEGG over-representation test
+gene <- names(geneList)[abs(geneList) > 0]
+kk <- enrichKEGG(gene         = gene,
+                 organism     = 'hsa',
+                 pvalueCutoff = 0.05)
+head(kk)
+View(kk)
+kk_dat = data.frame(kk)
+write.csv(kk_dat, file = "Mbr_vs_sMV_Mbr_KEGG.csv")
+View(kk_dat)
+res_name <- setReadable(kk, 'org.Hs.eg.db', 'ENTREZID')
+write.csv(res_name, file = "Mbr_vs_sMV_Mbr_KEGG_name.csv")
+dotplot(kk,showCategory=30)
+
+browseKEGG(kk, 'hsa04144')
+hsa04810 <- pathview(gene.data  = geneList,
+                     pathway.id = "hsa00970",
+                     species    = "hsa",
+                     limit      = list(gene=max(abs(geneList)), cpd=1))
+
+##KEGG GSEA
+kk2 <- gseKEGG(geneList     = geneList,
+               organism     = 'hsa',
+               nPerm        = 1000,
+               minGSSize    = 20,
+               pvalueCutoff = 1,
+               verbose      = FALSE)
+head(kk2)
+kk2_dat = data.frame(kk2)
+View(kk2_dat)
+write.csv(kk2_dat, file = "SW620_KEGG.csv")
+res_name <- setReadable(kk2, 'org.Hs.eg.db', 'ENTREZID')
+write.csv(res_name, file = "SW620_KEGG_name.csv")
+
+
+ridgeplot(kk2,showCategory=15, fill = "pvalue")
+dotplot(kk2, showCategory=10, color ="pvalue")
+
+emapplot(kk2, color="pvalue", layout = "nicely",method ="Wei")
+
+hsa04810 <- pathview(gene.data  = geneList,
+                     pathway.id = "hsa04145",
+                     species    = "hsa",
+                     limit      = list(gene=max(abs(geneList)), cpd=1))
+
+
+##compareClusters
+data(gcSample)
+res <- compareCluster(gcSample, fun="enrichPathway")
+dotplot(res)
+
+
+
+
